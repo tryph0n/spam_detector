@@ -1,0 +1,68 @@
+@startuml model_architectures
+!theme plain
+title SMS Spam Detection - Model Architectures
+
+package "BiLSTM Baseline" {
+    [Input Text] as lstm_input
+    [Embedding\n(vocab_size, 128)] as lstm_emb
+    [Bidirectional LSTM\n(hidden=64)] as lstm_layer
+    [Dropout (0.3)] as lstm_drop
+    [Linear (128→1)] as lstm_fc
+    [Sigmoid] as lstm_out
+
+    lstm_input --> lstm_emb
+    lstm_emb --> lstm_layer
+    lstm_layer --> lstm_drop
+    lstm_drop --> lstm_fc
+    lstm_fc --> lstm_out
+}
+
+package "RoBERTa-base" {
+    [Input Text] as rob_input
+    [BPE Tokenizer] as rob_tok
+    [Transformer Encoder\n(12 layers, 768 dim)] as rob_enc
+    [[CLS] Token] as rob_cls
+    [Classification Head] as rob_head
+    [Softmax] as rob_out
+
+    rob_input --> rob_tok
+    rob_tok --> rob_enc
+    rob_enc --> rob_cls
+    rob_cls --> rob_head
+    rob_head --> rob_out
+}
+
+package "DistilBERT" {
+    [Input Text] as dist_input
+    [WordPiece Tokenizer] as dist_tok
+    [Transformer Encoder\n(6 layers, 768 dim)] as dist_enc
+    [[CLS] Token] as dist_cls
+    [Classification Head] as dist_head
+    [Softmax] as dist_out
+
+    dist_input --> dist_tok
+    dist_tok --> dist_enc
+    dist_enc --> dist_cls
+    dist_cls --> dist_head
+    dist_head --> dist_out
+}
+
+note bottom of "BiLSTM Baseline"
+    ~500K parameters
+    CPU-friendly
+    Fast inference
+end note
+
+note bottom of "RoBERTa-base"
+    125M parameters
+    Best accuracy
+    Requires GPU
+end note
+
+note bottom of "DistilBERT"
+    66M parameters
+    Good trade-off
+    40% faster than RoBERTa
+end note
+
+@enduml
