@@ -1,0 +1,56 @@
+@startuml data_pipeline
+!theme plain
+title SMS Spam Detection - Data Pipeline
+
+start
+:Raw Data\n(spam.csv - 5,572 SMS);
+
+partition "Preprocessing" {
+    :Text Cleaning;
+    note right
+        - Lowercase
+        - URLs → "URL"
+        - Phone numbers → "PHONE"
+        - Remove extra whitespace
+    end note
+
+    :Remove Duplicates\n(430 removed → 5,142 unique);
+
+    :Stratified Split;
+    note right
+        - Train: 70% (3,599)
+        - Val: 15% (771)
+        - Test: 15% (772)
+        - Class ratio preserved
+    end note
+}
+
+partition "Tokenization" {
+    fork
+        :Custom Tokenizer\n(BiLSTM);
+    fork again
+        :HuggingFace Tokenizer\n(RoBERTa/DistilBERT);
+    end fork
+}
+
+partition "Model Training" {
+    fork
+        :BiLSTM\n(~500K params);
+    fork again
+        :RoBERTa\n(125M params);
+    fork again
+        :DistilBERT\n(66M params);
+    end fork
+}
+
+:Evaluation;
+note right
+    - Accuracy
+    - Precision (spam)
+    - Recall (spam)
+    - F1-score
+    - Confusion Matrix
+end note
+
+stop
+@enduml
