@@ -17,3 +17,5 @@ models/*
 
 # Jupyter
 .ipynb_checkpoints/
+
+.doc/
