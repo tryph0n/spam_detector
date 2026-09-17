@@ -18,4 +18,8 @@ models/*
 # Jupyter
 .ipynb_checkpoints/
 
+# Diagrams rendered from docs/*.puml (regenerate locally, do not track)
+docs/data_pipeline.png
+docs/model_architectures.png
+
 .doc/

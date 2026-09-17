@@ -6,50 +6,105 @@ start
 :Raw Data\n(spam.csv - 5,572 SMS);
 
 partition "Preprocessing" {
-    :Text Cleaning;
+    :Text Cleaning (clean_text);
     note right
-        - Lowercase
-        - URLs → "URL"
-        - Phone numbers → "PHONE"
-        - Remove extra whitespace
+        - Lowercase first
+        - URLs -> "URL"
+        - Phone / digit runs (5+) -> "PHONE"
+        - Collapse repeated whitespace
     end note
 
-    :Remove Duplicates\n(430 removed → 5,142 unique);
-
-    :Stratified Split;
+    :Remove Duplicates on CLEANED text\n(430 removed -> 5,142 unique);
     note right
-        - Train: 70% (3,599)
-        - Val: 15% (771)
-        - Test: 15% (772)
-        - Class ratio preserved
+        Deduplication runs BEFORE the split:
+        a message cannot land in two splits.
+        Remaining: 4,515 ham / 627 spam
     end note
+
+    :Stratified Split\n(train_test_split, random_state=42);
+    note right
+        Two-step 30% then 50% split
+        - Train: 70% (3,599 = 3,160 ham + 439 spam)
+        - Val  : 15% (771)
+        - Test : 15% (772 = 678 ham + 94 spam)
+        - Class ratio preserved (87.8 / 12.2)
+        - Zero text overlap asserted across splits
+    end note
+}
+
+partition "GAN Augmentation - side branch, feeds only the augmented BiLSTM" {
+    :Sentence Embeddings\nall-MiniLM-L6-v2 -> 384 dims;
+    :Train vanilla GAN on the 439 real spam embeddings;
+    note right
+        Generator     100 -> 256 -> 512 -> 384
+        Discriminator 384 -> 512 -> 256 -> 1
+        BCE loss, 200 epochs, lr 2e-4
+        Unconditional: trained on the spam subset only
+    end note
+
+    :Generate 2,721 synthetic embeddings;
+
+    :Back to text WITHOUT A DECODER\ncosine_similarity(...).argmax();
+    note right
+        There is NO embedding -> text decoder.
+        Each synthetic vector is mapped to its
+        nearest REAL training spam message, so
+        every "generated" SMS is an existing one.
+        2,721 retrievals hit only 52 distinct texts
+        (one of them 837 times) - mode collapse.
+        Net effect: weighted oversampling, no new text.
+    end note
+
+    :train_augmented.csv\n(3,160 ham + 3,160 spam);
 }
 
 partition "Tokenization" {
     fork
-        :Custom Tokenizer\n(BiLSTM);
+        :Custom Tokenizer\n(BiLSTM / TextCNN baselines);
+        note right
+            Vocabulary built on the train split only
+            - 3,547 tokens at min_freq = 2
+            - index 0 = PAD, index 1 = UNK
+            - max_len = 32 words (95th percentile)
+        end note
     fork again
-        :HuggingFace Tokenizer\n(RoBERTa/DistilBERT);
+        :Custom Tokenizer\n(BiLSTM on augmented data);
+        note right
+            Rebuilt on train_augmented.csv
+            - 3,654 tokens at min_freq = 2
+            - max_len = 34 words (95th percentile)
+        end note
+    fork again
+        :HuggingFace Tokenizer\n(RoBERTa BPE / DistilBERT WordPiece);
+        note right
+            max_length = 128 sub-tokens
+            padding = "max_length", truncation = True
+        end note
     end fork
 }
 
 partition "Model Training" {
     fork
-        :BiLSTM\n(~500K params);
+        :BiLSTM\n(553,473 params);
     fork again
-        :RoBERTa\n(125M params);
+        :TextCNN\n(608,217 params);
     fork again
-        :DistilBERT\n(66M params);
+        :BiLSTM + GAN augmentation\n(567,169 params);
+    fork again
+        :RoBERTa-base\n(124,647,170 params);
+    fork again
+        :DistilBERT\n(66,955,010 params);
     end fork
 }
 
-:Evaluation;
+:Evaluation on the test split (772 SMS);
 note right
     - Accuracy
     - Precision (spam)
     - Recall (spam)
     - F1-score
     - Confusion Matrix
+    Metrics persisted to models/*_results.json
 end note
 
 stop
