@@ -28,16 +28,18 @@ MODEL_COLORS = {
 
 
 @st.cache_data
-def load_results() -> dict:
+def load_results() -> tuple[dict, list[str]]:
+    """Return the results found on disk and the names of the missing models."""
     results = {}
+    missing = []
     for name, filename in MODEL_FILES.items():
         path = MODELS_DIR / filename
         if path.exists():
             with open(path) as f:
                 results[name] = json.load(f)
         else:
-            st.warning(f"Model {name} results not found: {path.relative_to(ROOT)}")
-    return results
+            missing.append(name)
+    return results, missing
 
 
 def build_performance_table(results: dict) -> pd.DataFrame:
@@ -236,11 +238,22 @@ flagging ham messages.
 
 st.title("Model Results")
 
-results = load_results()
+results, missing = load_results()
 
 if not results:
-    st.error("No model results found. Run `spam-detection_DL.ipynb` first.")
+    st.info(
+        "No trained model in models/. The models are not included in this "
+        "repository: train them first with `uv sync --group train`, then run all "
+        "cells of `spam-detection_DL.ipynb` (about 3 hours on CPU). See the README, "
+        "section Train the models."
+    )
     st.stop()
+
+if missing:
+    st.warning(
+        f"Results not found for: {', '.join(missing)}. "
+        "See the README, section Train the models."
+    )
 
 render_referential(results)
 

@@ -1,9 +1,9 @@
-"""AT&T Spam Detector -- Streamlit application entry point."""
+"""SMS Spam Detector -- Streamlit application entry point."""
 
 import streamlit as st
 
 st.set_page_config(
-    page_title="AT&T Spam Detector",
+    page_title="SMS Spam Detector",
     page_icon=":shield:",
     layout="wide",
 )

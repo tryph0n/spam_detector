@@ -54,20 +54,16 @@ def load_best_model_f1() -> tuple[str, float] | tuple[None, None]:
     return (best_name, best_f1) if best_name else (None, None)
 
 
-st.title("AT&T Spam Detector")
+st.title("SMS Spam Detector")
 st.markdown("### Automatic SMS spam detection using deep learning")
 
 st.divider()
 
 st.header("Context")
 st.markdown(
-    """
-    AT&T Inc. is the world's largest telecommunications company by revenue.
-    One of the main pain points AT&T users face is constant exposure to **spam messages**.
-
-    AT&T has been manually flagging spam messages, but they need an **automated solution**
-    to detect spam based solely on SMS content.
-    """
+    "Fictional business case from a data science training course: a telecom "
+    "operator (AT&T in the course brief) wants to flag spam SMS automatically, "
+    "based only on the message text. No affiliation with AT&T."
 )
 
 st.header("Dataset")
@@ -155,7 +151,9 @@ best_name, best_f1 = load_best_model_f1()
 best_model_line = (
     f"Best model so far: **{best_name}** (spam F1 = {best_f1:.4f})"
     if best_name
-    else "No trained models found yet -- run `spam-detection_DL.ipynb`."
+    else "No trained models found yet: train them first with "
+    "`uv sync --group train`, then run all cells of `spam-detection_DL.ipynb` "
+    "(about 3 hours on CPU). See the README, section Train the models."
 )
 
 st.markdown(

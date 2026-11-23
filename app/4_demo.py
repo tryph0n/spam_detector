@@ -16,6 +16,14 @@ try:
 except ImportError:
     TORCH_AVAILABLE = False
 
+st.title("Live Demo")
+if not TORCH_AVAILABLE:
+    st.error(
+        "The demo needs PyTorch, which is in the `train` dependency group: "
+        "run `uv sync --group train`. See the README, section Train the models."
+    )
+    st.stop()
+
 MODELS_DIR = Path(__file__).resolve().parent.parent / "models"
 
 SERVED_MODELS = ["BiLSTM", "TextCNN"]
@@ -224,14 +232,6 @@ def predict(text, model, vocab, max_len):
     return prob
 
 
-st.title("Live Demo")
-
-if not TORCH_AVAILABLE:
-    st.error(
-        "PyTorch is not installed. Install it with: `uv sync` or `uv pip install torch`"
-    )
-    st.stop()
-
 st.markdown("Enter an SMS message to check if it's spam or legitimate.")
 
 size_note = (
@@ -242,11 +242,11 @@ size_note = (
 
 st.info(
     f"This demo serves {describe_models(SERVED_MODELS)}, the two lightweight models "
-    f"the shipped vocabulary can load. {describe_models(HEAVY_MODELS)} score higher, "
+    f"the exported vocabulary can load. {describe_models(HEAVY_MODELS)} score higher, "
     "but the app does not depend on `transformers` at all and their checkpoints are "
     "two orders of magnitude larger, so neither one is served here. The GAN-augmented "
     "BiLSTM is just as small, but its training run rebuilt its own 3,654-token "
-    "vocabulary instead of reusing the 3,547-token one shipped here, so its "
+    "vocabulary instead of reusing the 3,547-token one used here, so its "
     "checkpoint cannot be reloaded against it. "
     f"{size_note}"
     "Full results are available on the Results page."
@@ -257,13 +257,18 @@ model_choice = st.radio("Select model", SERVED_MODELS, horizontal=True)
 model, vocab, max_len = load_model(model_choice)
 
 if vocab is None:
-    st.error("Vocabulary not found. Run the notebook first.")
+    st.info(
+        "No trained model in models/. The models are not included in this "
+        "repository: train them first with `uv sync --group train`, then run all "
+        "cells of `spam-detection_DL.ipynb` (about 3 hours on CPU). See the README, "
+        "section Train the models."
+    )
     st.stop()
 
 if model is None:
     st.warning(
         f"{model_choice} model not trained yet. "
-        "Run the notebook first to generate the checkpoint."
+        "See the README, section Train the models."
     )
     st.stop()
 
