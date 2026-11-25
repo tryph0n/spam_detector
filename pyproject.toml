@@ -1,34 +1,37 @@
 [project]
 name = "spam-detector"
 version = "0.1.0"
-description = "AT&T SMS Spam Detector using Deep Learning"
-requires-python = ">=3.11,<3.13"
+description = "SMS spam classification comparing BiLSTM, TextCNN, DistilBERT and RoBERTa, with a Streamlit demo app"
+requires-python = ">=3.11,<3.12"
 dependencies = [
-    "pandas",
-    "numpy",
-    "matplotlib",
-    "seaborn",
-    "scikit-learn",
-    "jupyter",
-    "ipykernel",
-    "tqdm",
-    "streamlit",
-    "plotly",
-    "accelerate>=1.13.0",
-    "sentence-transformers>=5.4.1",
-    "torch>=2.0.0",
-    "torchvision>=0.15.0",
-    "torchaudio",
-    "transformers",
-    "datasets>=3.0",
-    "torchinfo",
-    "pip>=26.0.1",
+    "numpy>=2.4,<3",
+    "pandas>=2.3,<3",
+    "plotly>=6.5,<7",
+    "streamlit>=1.54,<2",
 ]
 
-[project.optional-dependencies]
+[project.urls]
+Homepage = "https://github.com/tryph0n/spam_detector"
+Repository = "https://github.com/tryph0n/spam_detector"
+
+[dependency-groups]
 dev = [
-    "ruff",
-    "pytest",
+    "pytest>=9,<10",
+    "ruff==0.15.0",
+]
+train = [
+    "accelerate>=1.13,<2",
+    "datasets>=4.8,<5",
+    "ipykernel>=7,<8",
+    "jupyter>=1.1,<2",
+    "matplotlib>=3.10,<4",
+    "scikit-learn>=1.8,<2",
+    "seaborn>=0.13,<0.14",
+    "sentence-transformers>=5.4,<6",
+    "torch>=2.10,<3",
+    "torchinfo>=1.8,<2",
+    "tqdm>=4.66,<5",
+    "transformers>=4.57,<5",
 ]
 
 [build-system]
@@ -45,12 +48,12 @@ explicit = true
 
 [tool.uv.sources]
 torch = { index = "pytorch-cpu" }
-torchvision = { index = "pytorch-cpu" }
-torchaudio = { index = "pytorch-cpu" }
 
 [tool.ruff]
 line-length = 88
 target-version = "py311"
+extend-exclude = ["*.ipynb"]
+force-exclude = true
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM"]
@@ -58,3 +61,7 @@ ignore = ["E501"]  # line length handled by formatter
 
 [tool.ruff.format]
 docstring-code-format = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["app"]

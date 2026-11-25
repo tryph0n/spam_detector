@@ -1,29 +1,87 @@
 @startuml model_architectures
 !theme plain
-title SMS Spam Detection - Model Architectures
+title SMS Spam Detection - Model Architectures (5 trained models)
 
 package "BiLSTM Baseline" {
     [Input Text] as lstm_input
-    [Embedding\n(vocab_size, 128)] as lstm_emb
-    [Bidirectional LSTM\n(hidden=64)] as lstm_layer
-    [Dropout (0.3)] as lstm_drop
-    [Linear (128→1)] as lstm_fc
-    [Sigmoid] as lstm_out
+    [Custom Tokenizer\nvocab 3,547 - max_len 32] as lstm_tok
+    [Embedding\n3,547 x 128 - padding_idx=0] as lstm_emb
+    [Bidirectional LSTM\nhidden = 64 per direction] as lstm_layer
+    [Last time step\nconcat forward + backward = 128] as lstm_pool
+    [Dropout 0.3] as lstm_drop
+    [Linear 128 to 1] as lstm_fc
+    [Raw logit\nno Sigmoid layer] as lstm_out
 
-    lstm_input --> lstm_emb
+    lstm_input --> lstm_tok
+    lstm_tok --> lstm_emb
     lstm_emb --> lstm_layer
-    lstm_layer --> lstm_drop
+    lstm_layer --> lstm_pool
+    lstm_pool --> lstm_drop
     lstm_drop --> lstm_fc
     lstm_fc --> lstm_out
 }
 
+package "TextCNN Baseline (Kim 2014)" {
+    [Input Text] as cnn_input
+    [Custom Tokenizer\nvocab 3,547 - max_len 32] as cnn_tok
+    [Embedding\n3,547 x 128 - padding_idx=0] as cnn_emb
+    [Parallel Conv1d\nfilter sizes 3 / 4 / 5\n100 filters each + ReLU] as cnn_conv
+    [Max-over-time pooling\n3 x 100 = 300 scalars] as cnn_pool
+    [Dropout 0.3] as cnn_drop
+    [Linear 300 to 1] as cnn_fc
+    [Raw logit\nno Sigmoid layer] as cnn_out
+
+    cnn_input --> cnn_tok
+    cnn_tok --> cnn_emb
+    cnn_emb --> cnn_conv
+    cnn_conv --> cnn_pool
+    cnn_pool --> cnn_drop
+    cnn_drop --> cnn_fc
+    cnn_fc --> cnn_out
+}
+
+package "BiLSTM + GAN Augmentation" {
+    [train_augmented.csv\n3,160 ham + 3,160 spam] as gan_input
+    [Custom Tokenizer\nvocab 3,654 - max_len 34] as gan_tok
+    [Embedding\n3,654 x 128 - padding_idx=0] as gan_emb
+    [Bidirectional LSTM\nhidden = 64 per direction] as gan_layer
+    [Last time step\nconcat forward + backward = 128] as gan_pool
+    [Dropout 0.3] as gan_drop
+    [Linear 128 to 1] as gan_fc
+    [Raw logit\nno Sigmoid layer] as gan_out
+
+    gan_input --> gan_tok
+    gan_tok --> gan_emb
+    gan_emb --> gan_layer
+    gan_layer --> gan_pool
+    gan_pool --> gan_drop
+    gan_drop --> gan_fc
+    gan_fc --> gan_out
+}
+
+package "GAN (data augmentation, not a classifier)" {
+    [Real spam of the train split\n439 messages] as g_real
+    [all-MiniLM-L6-v2\nsentence embeddings - 384 dims] as g_embed
+    [Generator\n100 -> 256 -> 512 -> 384\nBatchNorm + ReLU, no output activation] as g_gen
+    [Discriminator\n384 -> 512 -> 256 -> 1\nLeakyReLU 0.2 + Dropout 0.3 + Sigmoid] as g_disc
+    [2,721 synthetic embeddings] as g_synth
+    [NO DECODER\nnearest-neighbour retrieval\nargmax of cosine similarity] as g_retrieve
+
+    g_real --> g_embed
+    g_embed --> g_disc
+    g_gen --> g_disc
+    g_gen --> g_synth
+    g_synth --> g_retrieve
+    g_retrieve --> gan_input
+}
+
 package "RoBERTa-base" {
     [Input Text] as rob_input
-    [BPE Tokenizer] as rob_tok
-    [Transformer Encoder\n(12 layers, 768 dim)] as rob_enc
-    [[CLS] Token] as rob_cls
-    [Classification Head] as rob_head
-    [Softmax] as rob_out
+    [BPE Tokenizer\nmax_length = 128 sub-tokens] as rob_tok
+    [Transformer Encoder\n12 layers, 768 dim] as rob_enc
+    [CLS token representation] as rob_cls
+    [Classification Head\nLinear to 2 logits] as rob_head
+    [Raw logits\nargmax at inference] as rob_out
 
     rob_input --> rob_tok
     rob_tok --> rob_enc
@@ -34,11 +92,11 @@ package "RoBERTa-base" {
 
 package "DistilBERT" {
     [Input Text] as dist_input
-    [WordPiece Tokenizer] as dist_tok
-    [Transformer Encoder\n(6 layers, 768 dim)] as dist_enc
-    [[CLS] Token] as dist_cls
-    [Classification Head] as dist_head
-    [Softmax] as dist_out
+    [WordPiece Tokenizer\nmax_length = 128 sub-tokens] as dist_tok
+    [Transformer Encoder\n6 layers, 768 dim] as dist_enc
+    [CLS token representation] as dist_cls
+    [Classification Head\nLinear to 2 logits] as dist_head
+    [Raw logits\nargmax at inference] as dist_out
 
     dist_input --> dist_tok
     dist_tok --> dist_enc
@@ -47,22 +105,64 @@ package "DistilBERT" {
     dist_head --> dist_out
 }
 
+' Hidden links only shape the layout into columns; they carry no meaning
+lstm_out -[hidden]-> rob_input
+cnn_out -[hidden]-> dist_input
+
 note bottom of "BiLSTM Baseline"
-    ~500K parameters
-    CPU-friendly
-    Fast inference
+    553,473 parameters
+    Loss: BCEWithLogitsLoss(pos_weight = 7.198)
+    Sigmoid is applied INSIDE the loss and at
+    prediction time only - it is not a layer.
+    Test: acc 0.9585 / P 0.7768 / R 0.9255 / F1 0.8447
+    Training: 678.84 s on CPU
+end note
+
+note bottom of "TextCNN Baseline (Kim 2014)"
+    608,217 parameters
+    Loss: BCEWithLogitsLoss(pos_weight = 7.198)
+    Test: acc 0.9767 / P 0.9222 / R 0.8830 / F1 0.9022
+    Training: 220.68 s on CPU - cheapest model here
+end note
+
+note bottom of "BiLSTM + GAN Augmentation"
+    567,169 parameters
+    Trained on data/processed/train_augmented.csv
+    pos_weight recomputed to 1.000 (set is balanced)
+    Test: acc 0.9715 / P 0.9091 / R 0.8511 / F1 0.8791
+    Precision gain comes from the rebalancing,
+    not from new information: recall drops 7.4 pp.
+    Training: 2,764.21 s on CPU
+end note
+
+note bottom of "GAN (data augmentation, not a classifier)"
+    Vanilla GAN, BCE loss, 200 epochs, lr 2e-4
+    Generator 355,968 + Discriminator 328,705 params
+    No decoder exists from embedding space back to
+    text, so augmentation can only RE-SELECT existing
+    training spam: 2,721 retrievals cover 52 distinct
+    texts (one 837 times) - documented mode collapse.
 end note
 
 note bottom of "RoBERTa-base"
-    125M parameters
-    Best accuracy
-    Requires GPU
+    124,647,170 parameters, all fine-tuned
+    Loss: class-weighted CrossEntropyLoss
+    (softmax is internal to the loss, not a layer)
+    Test: acc 0.9922 / P 0.9783 / R 0.9574 / F1 0.9677
+    Training: 4,059.95 s on CPU - recommended model
 end note
 
 note bottom of "DistilBERT"
-    66M parameters
-    Good trade-off
-    40% faster than RoBERTa
+    66,955,010 parameters (46.3% fewer than RoBERTa)
+    Loss: class-weighted CrossEntropyLoss
+    Test: acc 0.9909 / P 0.9780 / R 0.9468 / F1 0.9622
+    Training TIME measured in this project, on CPU:
+    2,057.24 s vs RoBERTa 4,059.95 s, i.e. 1.97x faster
+    to train (49.3% less training time).
+    This is a CPU TRAINING-time ratio measured here,
+    not the published inference benchmark of the
+    DistilBERT paper (which compares against BERT-base).
+    Inference latency was never measured in this project.
 end note
 
 @enduml

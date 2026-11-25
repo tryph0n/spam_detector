@@ -1,35 +1,24 @@
-"""Export vocabulary and tokenizer config from training data.
+"""Export the vocabulary and tokenizer config from the training split.
 
-Reproduces the exact vocabulary building process from notebook 03
-so that the BiLSTM model can be loaded for inference.
+Reproduces the vocabulary step of `spam-detection_DL.ipynb`, so that the
+BiLSTM and TextCNN checkpoints can be loaded for inference by the Demo page.
 """
 
+import argparse
+import logging
 import pickle
+import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "app"))
 
-def clean_text(text):
-    """Minimal cleaning matching notebook 02 preprocessing."""
-    import re
+from text_cleaning import clean_text  # noqa: E402
 
-    if not isinstance(text, str):
-        return ""
-    text = text.lower()
-    text = re.sub(
-        r"http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|"
-        r"[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+",
-        "URL",
-        text,
-    )
-    text = re.sub(r"www\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", "URL", text)
-    text = re.sub(
-        r"\b\d{5,}\b|\b\d{3}[-.]?\d{3}[-.]?\d{4}\b", "PHONE", text
-    )
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
+logger = logging.getLogger(__name__)
 
 
 def build_vocabulary(texts, min_freq=2):
@@ -48,39 +37,46 @@ def build_vocabulary(texts, min_freq=2):
     return vocab
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument(
+        "--out-dir",
+        type=Path,
+        default=ROOT / "models",
+        help="folder for vocab.pkl and tokenizer_config.pkl (default: models/)",
+    )
+    return parser.parse_args()
+
+
 def main():
-    data_dir = Path("data/processed")
-    model_dir = Path("models")
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
+    args = parse_args()
+    out_dir = args.out_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-    train_df = pd.read_csv(data_dir / "train.csv")
-
-    # Clean text (same pipeline as notebook 02)
+    train_df = pd.read_csv(ROOT / "data" / "processed" / "train.csv")
     train_df["clean_text"] = train_df["text"].apply(clean_text)
 
-    # Build vocabulary (same as notebook 03)
     vocab = build_vocabulary(train_df["clean_text"], min_freq=2)
 
-    # Compute max_len (95th percentile of word counts)
-    train_lengths = train_df["clean_text"].apply(
-        lambda x: len(str(x).split())
-    )
+    # 95th percentile of word counts, as in the notebook
+    train_lengths = train_df["clean_text"].apply(lambda x: len(str(x).split()))
     max_len = int(np.percentile(train_lengths, 95))
 
-    # Save artifacts
-    with open(model_dir / "vocab.pkl", "wb") as f:
+    with open(out_dir / "vocab.pkl", "wb") as f:
         pickle.dump(vocab, f)
 
     tokenizer_config = {
         "max_len": max_len,
         "vocab_size": len(vocab),
     }
-    with open(model_dir / "tokenizer_config.pkl", "wb") as f:
+    with open(out_dir / "tokenizer_config.pkl", "wb") as f:
         pickle.dump(tokenizer_config, f)
 
-    print(f"Vocabulary size: {len(vocab)}")
-    print(f"Max sequence length: {max_len}")
-    print(f"Saved: {model_dir / 'vocab.pkl'}")
-    print(f"Saved: {model_dir / 'tokenizer_config.pkl'}")
+    logger.info("Vocabulary size: %d", len(vocab))
+    logger.info("Max sequence length: %d", max_len)
+    logger.info("Saved: %s", out_dir / "vocab.pkl")
+    logger.info("Saved: %s", out_dir / "tokenizer_config.pkl")
 
 
 if __name__ == "__main__":
